@@ -46,3 +46,8 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Rules test dependencies
+rules_test/node_modules/
+rules_test/package-lock.json
+*-debug.log

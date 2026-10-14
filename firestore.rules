@@ -64,8 +64,12 @@ service cloud.firestore {
     // ---------------- attendance ----------------
     // Document id: {uid}_{yyyy-MM-dd}. Punch times must be the server clock.
     match /attendance/{id} {
+      // Own records only. A not-yet-created record of today is readable by
+      // its owner (matched by id prefix) so the app can listen for it.
       allow read: if isAdmin()
-        || (signedIn() && resource.data.uid == request.auth.uid);
+        || (signedIn() && (
+          (resource == null && id.matches(request.auth.uid + '_.*'))
+          || (resource != null && resource.data.uid == request.auth.uid)));
 
       allow create: if isActiveSelf(request.resource.data.uid)
         && id == request.resource.data.uid + '_' + request.resource.data.date

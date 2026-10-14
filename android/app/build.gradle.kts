@@ -29,6 +29,11 @@ android {
         versionName = flutter.versionName
     }
 
+    // Keep the face recognition model uncompressed so TFLite can memory-map it.
+    androidResources {
+        noCompress += "tflite"
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
