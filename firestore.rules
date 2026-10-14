@@ -1,0 +1,98 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && me().role == 'admin'
+        && me().active == true;
+    }
+
+    function isActiveSelf(uid) {
+      return signedIn() && request.auth.uid == uid && me().active == true;
+    }
+
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function validPunch(p) {
+      return p.time == request.time
+        && p.lat is number && p.lng is number && p.accuracy is number
+        && p.siteId is string && p.photoUrl is string && p.photoPath is string
+        && p.flagReasons is list;
+    }
+
+    // ---------------- users ----------------
+    match /users/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (isActiveSelf(uid) && (
+          // Bind this account to a device on first login.
+          (changed().hasOnly(['deviceId', 'deviceModel', 'deviceBoundAt'])
+            && resource.data.get('deviceId', null) == null
+            && request.resource.data.deviceId is string)
+          // Enroll the reference face once (admin can reset it).
+          || (changed().hasOnly(['faceEmbedding', 'faceUrl', 'facePath', 'faceEnrolledAt'])
+            && resource.data.get('faceEmbedding', null) == null
+            && request.resource.data.faceEmbedding is list)
+        ));
+    }
+
+    // ---------------- sites & shifts ----------------
+    match /sites/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /shifts/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---------------- attendance ----------------
+    // Document id: {uid}_{yyyy-MM-dd}. Punch times must be the server clock.
+    match /attendance/{id} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if isActiveSelf(request.resource.data.uid)
+        && id == request.resource.data.uid + '_' + request.resource.data.date
+        && request.resource.data.keys().hasOnly(
+             ['uid', 'employeeName', 'date', 'shiftId', 'checkIn', 'flagged', 'reviewed'])
+        && validPunch(request.resource.data.checkIn)
+        && request.resource.data.reviewed == false
+        && request.resource.data.flagged
+             == (request.resource.data.checkIn.flagReasons.size() > 0);
+
+      allow update: if
+        // Admin review decision.
+        (isAdmin() && changed().hasOnly(
+          ['reviewed', 'reviewDecision', 'reviewedBy', 'reviewedAt', 'reviewNote']))
+        // Employee check-out: once, never edits check-in.
+        || (isActiveSelf(resource.data.uid)
+          && !('checkOut' in resource.data)
+          && changed().hasOnly(['checkOut', 'flagged', 'reviewed'])
+          && validPunch(request.resource.data.checkOut)
+          && request.resource.data.flagged
+               == (resource.data.flagged
+                   || request.resource.data.checkOut.flagReasons.size() > 0)
+          && request.resource.data.reviewed
+               == (resource.data.reviewed
+                   && request.resource.data.checkOut.flagReasons.size() == 0));
+
+      allow delete: if isAdmin();
+    }
+  }
+}
