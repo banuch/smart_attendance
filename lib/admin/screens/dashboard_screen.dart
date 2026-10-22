@@ -28,7 +28,10 @@ class DashboardScreen extends ConsumerWidget {
     final pending = ref.watch(pendingReviewProvider).value?.length ?? 0;
 
     if (records.hasError) {
-      return EmptyState(Icons.error_outline, 'Could not load: ${records.error}');
+      return EmptyState(
+        Icons.error_outline,
+        'Could not load: ${records.error}',
+      );
     }
     if (!records.hasValue || !employees.hasValue || !shifts.hasValue) {
       return const Center(child: CircularProgressIndicator());
@@ -134,7 +137,9 @@ class DashboardScreen extends ConsumerWidget {
                               Text(
                                 r.record?.checkOut == null
                                     ? '-'
-                                    : timeFormat.format(r.record!.checkOut!.time),
+                                    : timeFormat.format(
+                                        r.record!.checkOut!.time,
+                                      ),
                               ),
                             ),
                             DataCell(Text(r.record?.checkIn.siteName ?? '-')),
@@ -143,7 +148,10 @@ class DashboardScreen extends ConsumerWidget {
                               (r.record?.pendingReview ?? false)
                                   ? const Tooltip(
                                       message: 'Needs review',
-                                      child: Icon(Icons.flag, color: Colors.orange),
+                                      child: Icon(
+                                        Icons.flag,
+                                        color: Colors.orange,
+                                      ),
                                     )
                                   : const SizedBox.shrink(),
                             ),
@@ -186,7 +194,10 @@ class DashboardScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 16),
-                SizedBox(height: 220, child: _WeekChart(rows: week, from: weekStart)),
+                SizedBox(
+                  height: 220,
+                  child: _WeekChart(rows: week, from: weekStart),
+                ),
               ],
             ),
           ),

@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -66,7 +65,7 @@ class _AdminShellState extends ConsumerState<AdminShell> {
         IconButton(
           tooltip: 'Sign out',
           icon: const Icon(Icons.logout),
-          onPressed: () => FirebaseAuth.instance.signOut(),
+          onPressed: () => ref.read(authStateProvider.notifier).signOut(),
         ),
       ],
     );

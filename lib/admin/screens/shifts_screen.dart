@@ -64,7 +64,9 @@ class ShiftsScreen extends ConsumerWidget {
                                       'until reassigned.',
                                   action: 'Delete',
                                 )) {
-                                  await ref.read(shiftRepoProvider).delete(s.id);
+                                  await ref
+                                      .read(shiftRepoProvider)
+                                      .delete(s.id);
                                 }
                               },
                             ),
@@ -144,18 +146,20 @@ class _ShiftFormDialogState extends ConsumerState<ShiftFormDialog> {
     }
     setState(() => _busy = true);
     try {
-      await ref.read(shiftRepoProvider).save(
-        Shift(
-          id: widget.shift?.id ?? '',
-          name: _name.text.trim(),
-          startMinutes: _start,
-          endMinutes: _end,
-          graceMinutes: int.parse(_grace.text),
-          halfDayAfterMinutes: int.parse(_halfDay.text),
-          minFullDayMinutes: (double.parse(_minHours.text) * 60).round(),
-          workDays: _days.toList()..sort(),
-        ),
-      );
+      await ref
+          .read(shiftRepoProvider)
+          .save(
+            Shift(
+              id: widget.shift?.id ?? '',
+              name: _name.text.trim(),
+              startMinutes: _start,
+              endMinutes: _end,
+              graceMinutes: int.parse(_grace.text),
+              halfDayAfterMinutes: int.parse(_halfDay.text),
+              minFullDayMinutes: (double.parse(_minHours.text) * 60).round(),
+              workDays: _days.toList()..sort(),
+            ),
+          );
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) showSnack(context, 'Could not save: $e', error: true);
@@ -208,7 +212,8 @@ class _ShiftFormDialogState extends ConsumerState<ShiftFormDialog> {
                   controller: _grace,
                   decoration: const InputDecoration(
                     labelText: 'Grace period (minutes)',
-                    helperText: 'Check-in up to this late still counts as on time.',
+                    helperText:
+                        'Check-in up to this late still counts as on time.',
                   ),
                   validator: _intValidator,
                 ),
@@ -225,13 +230,17 @@ class _ShiftFormDialogState extends ConsumerState<ShiftFormDialog> {
                   controller: _minHours,
                   decoration: const InputDecoration(
                     labelText: 'Minimum hours for a full day',
-                    helperText: 'Fewer worked hours (in → out) counts as half day.',
+                    helperText:
+                        'Fewer worked hours (in → out) counts as half day.',
                   ),
                   validator: (v) =>
                       double.tryParse(v ?? '') == null ? 'Number' : null,
                 ),
                 gap,
-                Text('Work days', style: Theme.of(context).textTheme.labelLarge),
+                Text(
+                  'Work days',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 6,
@@ -255,7 +264,10 @@ class _ShiftFormDialogState extends ConsumerState<ShiftFormDialog> {
           onPressed: _busy ? null : () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        FilledButton(onPressed: _busy ? null : _save, child: const Text('Save')),
+        FilledButton(
+          onPressed: _busy ? null : _save,
+          child: const Text('Save'),
+        ),
       ],
     );
   }

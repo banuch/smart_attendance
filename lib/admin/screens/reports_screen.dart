@@ -94,7 +94,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ActionChip(
           label: const Text('This month'),
           onPressed: () => _preset(
-            DateTimeRange(start: DateTime(now.year, now.month), end: dateOnly(now)),
+            DateTimeRange(
+              start: DateTime(now.year, now.month),
+              end: dateOnly(now),
+            ),
           ),
         ),
         ActionChip(
@@ -136,7 +139,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
 
     if (records.hasError) {
-      return EmptyState(Icons.error_outline, 'Could not load: ${records.error}');
+      return EmptyState(
+        Icons.error_outline,
+        'Could not load: ${records.error}',
+      );
     }
     if (!records.hasValue || !employees.hasValue || !shifts.hasValue) {
       return ListView(
@@ -189,7 +195,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               builder: (context, controller, _) => FilledButton.icon(
                 onPressed: rows.isEmpty || _exporting
                     ? null
-                    : () => controller.isOpen ? controller.close() : controller.open(),
+                    : () => controller.isOpen
+                          ? controller.close()
+                          : controller.open(),
                 icon: const Icon(Icons.download),
                 label: const Text('Export'),
               ),
@@ -266,7 +274,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             DataCell(Text(r.employee.name)),
             DataCell(StatusChip(r.eval.status)),
             DataCell(
-              Text(r.record == null ? '-' : timeFormat.format(r.record!.checkIn.time)),
+              Text(
+                r.record == null
+                    ? '-'
+                    : timeFormat.format(r.record!.checkIn.time),
+              ),
             ),
             DataCell(
               Text(
@@ -276,9 +288,15 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               ),
             ),
             DataCell(
-              Text(r.eval.workedMinutes == 0 ? '-' : formatDuration(r.eval.workedMinutes)),
+              Text(
+                r.eval.workedMinutes == 0
+                    ? '-'
+                    : formatDuration(r.eval.workedMinutes),
+              ),
             ),
-            DataCell(Text(r.eval.lateMinutes == 0 ? '-' : '${r.eval.lateMinutes}m')),
+            DataCell(
+              Text(r.eval.lateMinutes == 0 ? '-' : '${r.eval.lateMinutes}m'),
+            ),
             DataCell(Text(r.record?.checkIn.siteName ?? '-')),
             DataCell(
               (r.record?.flagged ?? false)

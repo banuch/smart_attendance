@@ -1,18 +1,21 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../data/api_client.dart';
+import '../data/providers.dart';
 
 /// Email / password sign-in used by both the employee app and admin panel.
-class LoginForm extends StatefulWidget {
+class LoginForm extends ConsumerStatefulWidget {
   const LoginForm({super.key, required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
 
   @override
-  State<LoginForm> createState() => _LoginFormState();
+  ConsumerState<LoginForm> createState() => _LoginFormState();
 }
 
-class _LoginFormState extends State<LoginForm> {
+class _LoginFormState extends ConsumerState<LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
@@ -34,42 +37,18 @@ class _LoginFormState extends State<LoginForm> {
       _error = null;
     });
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _email.text.trim(),
-        password: _password.text,
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = _message(e));
+      await ref
+          .read(authStateProvider.notifier)
+          .signIn(_email.text.trim(), _password.text);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _forgotPassword() async {
-    final email = _email.text.trim();
-    if (email.isEmpty) {
-      setState(() => _error = 'Enter your email first.');
-      return;
-    }
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (mounted) {
-        setState(() => _error = 'Password reset email sent to $email.');
-      }
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = _message(e));
-    }
-  }
-
-  String _message(FirebaseAuthException e) => switch (e.code) {
-    'invalid-credential' ||
-    'wrong-password' ||
-    'user-not-found' => 'Incorrect email or password.',
-    'user-disabled' => 'This account has been disabled.',
-    'too-many-requests' => 'Too many attempts. Try again later.',
-    'network-request-failed' => 'No internet connection.',
-    _ => e.message ?? 'Sign-in failed.',
-  };
+  void _forgotPassword() =>
+      setState(() => _error = 'Ask your admin to set a new password for you.');
 
   @override
   Widget build(BuildContext context) {
@@ -110,8 +89,9 @@ class _LoginFormState extends State<LoginForm> {
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
-                  validator: (v) =>
-                      (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                  validator: (v) => (v == null || !v.contains('@'))
+                      ? 'Enter a valid email'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -167,7 +147,7 @@ class _LoginFormState extends State<LoginForm> {
 }
 
 /// Full-screen message with an optional sign-out button.
-class BlockedScreen extends StatelessWidget {
+class BlockedScreen extends ConsumerWidget {
   const BlockedScreen({
     super.key,
     required this.icon,
@@ -180,7 +160,7 @@ class BlockedScreen extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: Center(
         child: Padding(
@@ -195,7 +175,7 @@ class BlockedScreen extends StatelessWidget {
               Text(message, textAlign: TextAlign.center),
               const SizedBox(height: 24),
               OutlinedButton.icon(
-                onPressed: () => FirebaseAuth.instance.signOut(),
+                onPressed: () => ref.read(authStateProvider.notifier).signOut(),
                 icon: const Icon(Icons.logout),
                 label: const Text('Sign out'),
               ),

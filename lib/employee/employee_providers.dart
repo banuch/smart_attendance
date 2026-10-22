@@ -26,30 +26,27 @@ final punchServiceProvider = Provider(
   (ref) => PunchService(
     attendance: ref.watch(attendanceRepoProvider),
     users: ref.watch(userRepoProvider),
-    storage: ref.watch(storageProvider),
   ),
 );
 
 /// Today's record for the signed-in employee.
 final todayRecordProvider = StreamProvider<AttendanceRecord?>((ref) {
-  final uid = ref.watch(authStateProvider).value?.uid;
-  if (uid == null) return Stream.value(null);
-  return ref
-      .watch(attendanceRepoProvider)
-      .watchDay(uid, dateKey(DateTime.now()));
+  if (ref.watch(sessionUidProvider) == null) return Stream.value(null);
+  return ref.watch(attendanceRepoProvider).watchToday();
 });
 
 /// Signed-in employee's records for a month (first day of month as key).
-final myMonthProvider =
-    StreamProvider.family<List<AttendanceRecord>, DateTime>((ref, month) {
-      final uid = ref.watch(authStateProvider).value?.uid;
-      if (uid == null) return Stream.value(const []);
-      final from = DateTime(month.year, month.month);
-      final to = DateTime(month.year, month.month + 1, 0);
-      return ref
-          .watch(attendanceRepoProvider)
-          .watchUserRange(uid, dateKey(from), dateKey(to));
-    });
+final myMonthProvider = StreamProvider.family<List<AttendanceRecord>, DateTime>(
+  (ref, month) {
+    final uid = ref.watch(sessionUidProvider);
+    if (uid == null) return Stream.value(const []);
+    final from = DateTime(month.year, month.month);
+    final to = DateTime(month.year, month.month + 1, 0);
+    return ref
+        .watch(attendanceRepoProvider)
+        .watchUserRange(uid, dateKey(from), dateKey(to));
+  },
+);
 
 final myShiftProvider = Provider<Shift?>((ref) {
   final shiftId = ref.watch(currentUserProvider).value?.shiftId;

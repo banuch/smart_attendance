@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,12 +6,7 @@ import '../../core/models/app_user.dart';
 import '../../core/models/shift.dart';
 import '../../core/models/site.dart';
 import '../../core/theme.dart';
-import '../services/admin_user_service.dart';
 import '../widgets/common.dart';
-
-final adminUserServiceProvider = Provider(
-  (ref) => AdminUserService(ref.watch(userRepoProvider)),
-);
 
 class EmployeesScreen extends ConsumerStatefulWidget {
   const EmployeesScreen({super.key});
@@ -117,7 +111,9 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
                                   e.siteIds.isEmpty
                                       ? 'Any'
                                       : sites
-                                            .where((s) => e.siteIds.contains(s.id))
+                                            .where(
+                                              (s) => e.siteIds.contains(s.id),
+                                            )
                                             .map((s) => s.name)
                                             .join(', '),
                                 ),
@@ -132,7 +128,9 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
                                 Text(
                                   e.active ? 'Active' : 'Inactive',
                                   style: TextStyle(
-                                    color: e.active ? Colors.green : Colors.grey,
+                                    color: e.active
+                                        ? Colors.green
+                                        : Colors.grey,
                                   ),
                                 ),
                               ),
@@ -187,7 +185,10 @@ class _EmployeeActions extends ConsumerWidget {
                       'The next phone they sign in on becomes their device.',
                   action: 'Reset',
                 )) {
-                  await run('Device reset', () => users.resetDevice(employee.uid));
+                  await run(
+                    'Device reset',
+                    () => users.resetDevice(employee.uid),
+                  );
                 }
               case 'face':
                 if (context.mounted &&
@@ -201,12 +202,9 @@ class _EmployeeActions extends ConsumerWidget {
                   await run('Face reset', () => users.resetFace(employee.uid));
                 }
               case 'password':
-                await run(
-                  'Password reset email sent to ${employee.email}',
-                  () => ref
-                      .read(adminUserServiceProvider)
-                      .sendPasswordReset(employee.email),
-                );
+                if (context.mounted) {
+                  await SetPasswordDialog.show(context, employee: employee);
+                }
             }
           },
           itemBuilder: (_) => [
@@ -222,7 +220,7 @@ class _EmployeeActions extends ConsumerWidget {
             ),
             const PopupMenuItem(
               value: 'password',
-              child: Text('Send password reset email'),
+              child: Text('Set new password'),
             ),
           ],
         ),
@@ -290,9 +288,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
     );
     try {
       if (_isNew) {
-        await ref
-            .read(adminUserServiceProvider)
-            .createEmployee(profile, _password.text);
+        await ref.read(userRepoProvider).create(profile, _password.text);
       } else {
         await ref.read(userRepoProvider).updateProfile(profile);
       }
@@ -300,15 +296,6 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
         Navigator.pop(context);
         showSnack(context, _isNew ? 'Employee created' : 'Employee updated');
       }
-    } on FirebaseAuthException catch (e) {
-      setState(
-        () => _error = switch (e.code) {
-          'email-already-in-use' => 'An account with this email already exists.',
-          'weak-password' => 'Password is too weak (min 6 characters).',
-          'invalid-email' => 'Invalid email address.',
-          _ => e.message ?? e.code,
-        },
-      );
     } catch (e) {
       setState(() => _error = '$e');
     } finally {
@@ -344,7 +331,9 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: _code,
-                        decoration: const InputDecoration(labelText: 'Employee code'),
+                        decoration: const InputDecoration(
+                          labelText: 'Employee code',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -360,13 +349,12 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                 gap,
                 TextFormField(
                   controller: _email,
-                  enabled: _isNew,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Email (login) *',
-                    helperText: _isNew ? null : 'Login email cannot be changed here.',
                   ),
-                  validator: (v) => v!.contains('@') ? null : 'Enter a valid email',
+                  validator: (v) =>
+                      v!.contains('@') ? null : 'Enter a valid email',
                 ),
                 if (_isNew) ...[
                   gap,
@@ -374,9 +362,10 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                     controller: _password,
                     decoration: const InputDecoration(
                       labelText: 'Initial password *',
-                      helperText: 'Share with the employee; they can reset it later.',
+                      helperText: 'Share with the employee. You can set a new one later.',
                     ),
-                    validator: (v) => v!.length < 6 ? 'Minimum 6 characters' : null,
+                    validator: (v) =>
+                        v!.length < 8 ? 'Minimum 8 characters' : null,
                   ),
                 ],
                 gap,
@@ -407,7 +396,10 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                             : null,
                         decoration: const InputDecoration(labelText: 'Shift'),
                         items: [
-                          const DropdownMenuItem(value: null, child: Text('None')),
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('None'),
+                          ),
                           for (final s in shifts)
                             DropdownMenuItem(
                               value: s.id,
@@ -420,7 +412,10 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                   ],
                 ),
                 gap,
-                Text('Allowed sites', style: Theme.of(context).textTheme.labelLarge),
+                Text(
+                  'Allowed sites',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
                 const SizedBox(height: 4),
                 if (sites.isEmpty)
                   const Text('No sites yet. Add one under Sites.')
@@ -433,7 +428,8 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                           label: Text(s.name),
                           selected: _siteIds.contains(s.id),
                           onSelected: (v) => setState(
-                            () => v ? _siteIds.add(s.id) : _siteIds.remove(s.id),
+                            () =>
+                                v ? _siteIds.add(s.id) : _siteIds.remove(s.id),
                           ),
                         ),
                     ],
@@ -446,14 +442,18 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Active'),
-                  subtitle: const Text('Inactive accounts cannot mark attendance.'),
+                  subtitle: const Text(
+                    'Inactive accounts cannot mark attendance.',
+                  ),
                   value: _active,
                   onChanged: (v) => setState(() => _active = v),
                 ),
                 if (_error != null)
                   Text(
                     _error!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
               ],
             ),
@@ -474,6 +474,102 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Admin sets a new password; the employee is signed out everywhere.
+class SetPasswordDialog extends ConsumerStatefulWidget {
+  const SetPasswordDialog({super.key, required this.employee});
+
+  final AppUser employee;
+
+  static Future<void> show(BuildContext context, {required AppUser employee}) =>
+      showDialog(
+        context: context,
+        builder: (_) => SetPasswordDialog(employee: employee),
+      );
+
+  @override
+  ConsumerState<SetPasswordDialog> createState() => _SetPasswordDialogState();
+}
+
+class _SetPasswordDialogState extends ConsumerState<SetPasswordDialog> {
+  final _form = GlobalKey<FormState>();
+  final _password = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_form.currentState!.validate()) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(userRepoProvider)
+          .setPassword(widget.employee.uid, _password.text);
+      if (mounted) {
+        Navigator.pop(context);
+        showSnack(context, 'Password changed for ${widget.employee.name}');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('New password for ${widget.employee.name}'),
+      content: SizedBox(
+        width: 400,
+        child: Form(
+          key: _form,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _password,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'New password',
+                  helperText: 'They will be signed out on every device.',
+                ),
+                validator: (v) => v!.length < 8 ? 'Minimum 8 characters' : null,
+                onFieldSubmitted: (_) => _save(),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : _save,
+          child: const Text('Set password'),
         ),
       ],
     );

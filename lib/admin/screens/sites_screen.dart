@@ -129,16 +129,18 @@ class _SiteFormDialogState extends ConsumerState<SiteFormDialog> {
     if (!_form.currentState!.validate()) return;
     setState(() => _busy = true);
     try {
-      await ref.read(siteRepoProvider).save(
-        Site(
-          id: widget.site?.id ?? '',
-          name: _name.text.trim(),
-          address: _address.text.trim(),
-          lat: double.parse(_lat.text),
-          lng: double.parse(_lng.text),
-          radiusMeters: _radius,
-        ),
-      );
+      await ref
+          .read(siteRepoProvider)
+          .save(
+            Site(
+              id: widget.site?.id ?? '',
+              name: _name.text.trim(),
+              address: _address.text.trim(),
+              lat: double.parse(_lat.text),
+              lng: double.parse(_lng.text),
+              radiusMeters: _radius,
+            ),
+          );
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) showSnack(context, 'Could not save: $e', error: true);
@@ -194,7 +196,9 @@ class _SiteFormDialogState extends ConsumerState<SiteFormDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: _lat,
-                        decoration: const InputDecoration(labelText: 'Latitude *'),
+                        decoration: const InputDecoration(
+                          labelText: 'Latitude *',
+                        ),
                         validator: (v) => _coordValidator(v, 90),
                         onChanged: (_) => setState(() {}),
                       ),
@@ -203,7 +207,9 @@ class _SiteFormDialogState extends ConsumerState<SiteFormDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: _lng,
-                        decoration: const InputDecoration(labelText: 'Longitude *'),
+                        decoration: const InputDecoration(
+                          labelText: 'Longitude *',
+                        ),
                         validator: (v) => _coordValidator(v, 180),
                         onChanged: (_) => setState(() {}),
                       ),
@@ -211,7 +217,9 @@ class _SiteFormDialogState extends ConsumerState<SiteFormDialog> {
                     IconButton(
                       tooltip: 'Centre map on coordinates',
                       icon: const Icon(Icons.my_location),
-                      onPressed: point == null ? null : () => _map.move(point, 17),
+                      onPressed: point == null
+                          ? null
+                          : () => _map.move(point, 17),
                     ),
                   ],
                 ),
@@ -262,7 +270,10 @@ class _SiteFormDialogState extends ConsumerState<SiteFormDialog> {
           onPressed: _busy ? null : () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        FilledButton(onPressed: _busy ? null : _save, child: const Text('Save')),
+        FilledButton(
+          onPressed: _busy ? null : _save,
+          child: const Text('Save'),
+        ),
       ],
     );
   }

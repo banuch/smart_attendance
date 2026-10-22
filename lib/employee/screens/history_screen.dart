@@ -85,14 +85,26 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         children: [
-                          _Stat('Present', count((s) => s.attended), Colors.green),
-                          _Stat('Late', count((s) => s == DayStatus.late), Colors.orange),
+                          _Stat(
+                            'Present',
+                            count((s) => s.attended),
+                            Colors.green,
+                          ),
+                          _Stat(
+                            'Late',
+                            count((s) => s == DayStatus.late),
+                            Colors.orange,
+                          ),
                           _Stat(
                             'Half day',
                             count((s) => s == DayStatus.halfDay),
                             Colors.deepOrange,
                           ),
-                          _Stat('Absent', count((s) => s == DayStatus.absent), Colors.red),
+                          _Stat(
+                            'Absent',
+                            count((s) => s == DayStatus.absent),
+                            Colors.red,
+                          ),
                         ],
                       ),
                     ),
@@ -132,9 +144,8 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           '$value',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(color: color),
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(color: color),
         ),
         Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],

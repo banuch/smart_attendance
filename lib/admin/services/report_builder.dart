@@ -66,7 +66,8 @@ class ReportBuilder {
       for (final day in daysInRange(from, last)) {
         final record = recordByKey[AttendanceRecord.docId(e.uid, dateKey(day))];
         if (!e.active && record == null) continue;
-        final shift = shiftById[record?.shiftId ?? e.shiftId] ?? shiftById[e.shiftId];
+        final shift =
+            shiftById[record?.shiftId ?? e.shiftId] ?? shiftById[e.shiftId];
         rows.add(
           ReportRow(
             employee: e,

@@ -4,14 +4,12 @@ class AppConfig {
 
   static const appName = 'Smart Attendance';
 
-  /// Cosine similarity at or above which a selfie is considered the same
-  /// person as the enrolled reference face (MobileFaceNet embeddings).
-  static const faceMatchThreshold = 0.55;
-
   /// Path of the MobileFaceNet model bundled under assets/.
   static const faceModelAsset = 'assets/models/mobilefacenet.tflite';
 
   /// GPS fixes worse than this (metres) are accepted but flagged for review.
+  /// Only used for the on-screen warning; the server applies its own
+  /// MAX_GPS_ACCURACY_METERS, as it does FACE_MATCH_THRESHOLD.
   static const maxGpsAccuracyMeters = 50.0;
 
   /// How long to wait for a GPS fix before giving up.

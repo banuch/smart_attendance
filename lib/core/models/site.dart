@@ -24,6 +24,9 @@ class Site {
     address: m['address'] as String? ?? '',
   );
 
+  factory Site.fromJson(Map<String, dynamic> m) =>
+      Site.fromMap(m['id'] as String, m);
+
   Map<String, dynamic> toMap() => {
     'name': name,
     'lat': lat,

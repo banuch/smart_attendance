@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_attendance/admin/services/report_builder.dart';
 import 'package:smart_attendance/admin/services/report_exporter.dart';
@@ -65,12 +64,27 @@ void main() {
       expect(distanceMeters(0, 0, 1, 0), closeTo(111195, 50));
       expect(distanceMeters(12.9716, 77.5946, 12.9716, 77.5946), 0);
       // Two points ~100 m apart.
-      expect(distanceMeters(12.9716, 77.5946, 12.9725, 77.5946), closeTo(100, 1));
+      expect(
+        distanceMeters(12.9716, 77.5946, 12.9725, 77.5946),
+        closeTo(100, 1),
+      );
     });
 
     test('nearestSite prefers a site the point is inside', () {
-      const big = Site(id: 'big', name: 'Big', lat: 0, lng: 0.002, radiusMeters: 500);
-      const small = Site(id: 'small', name: 'Small', lat: 0, lng: 0.0005, radiusMeters: 20);
+      const big = Site(
+        id: 'big',
+        name: 'Big',
+        lat: 0,
+        lng: 0.002,
+        radiusMeters: 500,
+      );
+      const small = Site(
+        id: 'small',
+        name: 'Small',
+        lat: 0,
+        lng: 0.0005,
+        radiusMeters: 20,
+      );
       final m = nearestSite(0, 0, [small, big])!;
       expect(m.site.id, 'big');
       expect(m.inside, isTrue);
@@ -120,7 +134,11 @@ void main() {
 
     test('on time within grace', () {
       final e = eval(
-        record('a', DateTime(2026, 10, 12, 9, 8), outTime: DateTime(2026, 10, 12, 18)),
+        record(
+          'a',
+          DateTime(2026, 10, 12, 9, 8),
+          outTime: DateTime(2026, 10, 12, 18),
+        ),
       );
       expect(e.status, DayStatus.present);
       expect(e.lateMinutes, 0);
@@ -129,7 +147,11 @@ void main() {
 
     test('late after grace', () {
       final e = eval(
-        record('a', DateTime(2026, 10, 12, 9, 25), outTime: DateTime(2026, 10, 12, 18)),
+        record(
+          'a',
+          DateTime(2026, 10, 12, 9, 25),
+          outTime: DateTime(2026, 10, 12, 18),
+        ),
       );
       expect(e.status, DayStatus.late);
       expect(e.lateMinutes, 25);
@@ -137,14 +159,22 @@ void main() {
 
     test('half day when very late', () {
       final e = eval(
-        record('a', DateTime(2026, 10, 12, 11, 30), outTime: DateTime(2026, 10, 12, 18)),
+        record(
+          'a',
+          DateTime(2026, 10, 12, 11, 30),
+          outTime: DateTime(2026, 10, 12, 18),
+        ),
       );
       expect(e.status, DayStatus.halfDay);
     });
 
     test('half day when worked too little', () {
       final e = eval(
-        record('a', DateTime(2026, 10, 12, 9), outTime: DateTime(2026, 10, 12, 13)),
+        record(
+          'a',
+          DateTime(2026, 10, 12, 9),
+          outTime: DateTime(2026, 10, 12, 13),
+        ),
       );
       expect(e.status, DayStatus.halfDay);
       expect(e.workedMinutes, 240);
@@ -152,7 +182,10 @@ void main() {
 
     test('absent, weekly off and rejected', () {
       expect(eval(null).status, DayStatus.absent);
-      expect(eval(null, day: DateTime(2026, 10, 18)).status, DayStatus.weeklyOff);
+      expect(
+        eval(null, day: DateTime(2026, 10, 18)).status,
+        DayStatus.weeklyOff,
+      );
       final rejected = record(
         'a',
         DateTime(2026, 10, 12, 9),
@@ -185,13 +218,13 @@ void main() {
   });
 
   group('AttendanceRecord', () {
-    test('parses Firestore map', () {
+    test('parses API json', () {
       final r = AttendanceRecord.fromMap('u_2026-10-12', {
         'uid': 'u',
         'employeeName': 'Asha',
         'date': '2026-10-12',
         'checkIn': {
-          'time': Timestamp.fromDate(DateTime(2026, 10, 12, 9)),
+          'time': DateTime(2026, 10, 12, 9).toUtc().toIso8601String(),
           'lat': 1,
           'lng': 2,
           'accuracy': 8,
@@ -210,15 +243,47 @@ void main() {
   });
 
   group('ReportBuilder', () {
-    const asha = AppUser(uid: 'asha', name: 'Asha', email: 'a@x.com', shiftId: 'day');
-    const ravi = AppUser(uid: 'ravi', name: 'Ravi', email: 'r@x.com', shiftId: 'day');
-    const boss = AppUser(uid: 'boss', name: 'Boss', email: 'b@x.com', role: UserRole.admin);
-    const gone = AppUser(uid: 'gone', name: 'Gone', email: 'g@x.com', active: false);
+    const asha = AppUser(
+      uid: 'asha',
+      name: 'Asha',
+      email: 'a@x.com',
+      shiftId: 'day',
+    );
+    const ravi = AppUser(
+      uid: 'ravi',
+      name: 'Ravi',
+      email: 'r@x.com',
+      shiftId: 'day',
+    );
+    const boss = AppUser(
+      uid: 'boss',
+      name: 'Boss',
+      email: 'b@x.com',
+      role: UserRole.admin,
+    );
+    const gone = AppUser(
+      uid: 'gone',
+      name: 'Gone',
+      email: 'g@x.com',
+      active: false,
+    );
 
     final records = [
-      record('asha', DateTime(2026, 10, 12, 9), outTime: DateTime(2026, 10, 12, 18)),
-      record('asha', DateTime(2026, 10, 13, 9, 30), outTime: DateTime(2026, 10, 13, 18)),
-      record('ravi', DateTime(2026, 10, 12, 9, 5), outTime: DateTime(2026, 10, 12, 18)),
+      record(
+        'asha',
+        DateTime(2026, 10, 12, 9),
+        outTime: DateTime(2026, 10, 12, 18),
+      ),
+      record(
+        'asha',
+        DateTime(2026, 10, 13, 9, 30),
+        outTime: DateTime(2026, 10, 13, 18),
+      ),
+      record(
+        'ravi',
+        DateTime(2026, 10, 12, 9, 5),
+        outTime: DateTime(2026, 10, 12, 18),
+      ),
     ];
 
     List<ReportRow> build({String? uid}) => ReportBuilder.rows(
@@ -239,7 +304,9 @@ void main() {
     });
 
     test('summary counts', () {
-      final summary = {for (final s in ReportBuilder.summarize(build())) s.employee.uid: s};
+      final summary = {
+        for (final s in ReportBuilder.summarize(build())) s.employee.uid: s,
+      };
       final a = summary['asha']!;
       expect(a.present, 1);
       expect(a.late, 1);

@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/data/providers.dart';
 import '../../core/models/app_user.dart';
 import '../../core/theme.dart';
 import '../employee_providers.dart';
@@ -67,7 +67,7 @@ class _EnrollFaceScreenState extends ConsumerState<EnrollFaceScreen> {
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),
-            onPressed: () => FirebaseAuth.instance.signOut(),
+            onPressed: () => ref.read(authStateProvider.notifier).signOut(),
           ),
         ],
       ),
@@ -83,7 +83,10 @@ class _EnrollFaceScreenState extends ConsumerState<EnrollFaceScreen> {
             ),
             const SizedBox(height: 16),
             const _Tip(Icons.wb_sunny_outlined, 'Face a light source'),
-            const _Tip(Icons.face_retouching_off, 'Remove sunglasses, mask or cap'),
+            const _Tip(
+              Icons.face_retouching_off,
+              'Remove sunglasses, mask or cap',
+            ),
             const _Tip(Icons.person_outline, 'Only you in the frame'),
             const SizedBox(height: 24),
             if (photo != null)

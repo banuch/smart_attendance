@@ -46,7 +46,6 @@ class _AttendanceDetailDialogState
           .review(
             widget.record.id,
             decision: decision,
-            reviewerUid: ref.read(authProvider).currentUser!.uid,
             note: _note.text.trim().isEmpty ? null : _note.text.trim(),
           );
       if (mounted) Navigator.pop(context);
@@ -91,7 +90,11 @@ class _AttendanceDetailDialogState
                       _FaceColumn('Registered face', employee?.faceUrl, null),
                       _FaceColumn('Check in', r.checkIn.photoUrl, r.checkIn),
                       if (r.checkOut != null)
-                        _FaceColumn('Check out', r.checkOut!.photoUrl, r.checkOut),
+                        _FaceColumn(
+                          'Check out',
+                          r.checkOut!.photoUrl,
+                          r.checkOut,
+                        ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -193,8 +196,14 @@ class _FaceColumn extends StatelessWidget {
           SelfieThumb(url, size: 220),
           if (p != null) ...[
             const SizedBox(height: 6),
-            Text(timeFormat.format(p.time), style: Theme.of(context).textTheme.titleMedium),
-            Text('${p.siteName} · ${p.distanceMeters.round()} m from centre', style: small),
+            Text(
+              timeFormat.format(p.time),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            Text(
+              '${p.siteName} · ${p.distanceMeters.round()} m from centre',
+              style: small,
+            ),
             Text('GPS ±${p.accuracy.round()} m', style: small),
             Text(
               p.faceScore == null

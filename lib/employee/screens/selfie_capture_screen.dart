@@ -138,9 +138,8 @@ class _SelfieCaptureScreenState extends State<SelfieCaptureScreen>
                   child: Text(
                     'Fit your face inside the oval',
                     textAlign: TextAlign.center,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleMedium?.copyWith(color: Colors.white),
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(color: Colors.white),
                   ),
                 ),
                 Positioned(

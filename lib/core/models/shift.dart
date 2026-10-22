@@ -48,6 +48,9 @@ class Shift {
         const [1, 2, 3, 4, 5, 6],
   );
 
+  factory Shift.fromJson(Map<String, dynamic> m) =>
+      Shift.fromMap(m['id'] as String, m);
+
   Map<String, dynamic> toMap() => {
     'name': name,
     'start': formatHm(startMinutes),

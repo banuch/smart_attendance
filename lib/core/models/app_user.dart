@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 enum UserRole { admin, employee }
 
 class AppUser {
@@ -15,7 +13,7 @@ class AppUser {
     this.shiftId,
     this.deviceId,
     this.deviceModel,
-    this.faceEmbedding,
+    this.faceEnrolled = false,
     this.faceUrl,
   });
 
@@ -35,12 +33,12 @@ class AppUser {
   final String? deviceId;
   final String? deviceModel;
 
-  /// Reference face embedding; null until the employee enrolls their face.
-  final List<double>? faceEmbedding;
+  /// Whether a reference face is registered. The embedding itself stays on
+  /// the server, which does the matching.
+  final bool faceEnrolled;
   final String? faceUrl;
 
   bool get isAdmin => role == UserRole.admin;
-  bool get faceEnrolled => faceEmbedding != null && faceEmbedding!.isNotEmpty;
 
   factory AppUser.fromMap(String uid, Map<String, dynamic> m) => AppUser(
     uid: uid,
@@ -54,14 +52,12 @@ class AppUser {
     shiftId: m['shiftId'] as String?,
     deviceId: m['deviceId'] as String?,
     deviceModel: m['deviceModel'] as String?,
-    faceEmbedding: (m['faceEmbedding'] as List?)
-        ?.map((e) => (e as num).toDouble())
-        .toList(),
+    faceEnrolled: m['faceEnrolled'] as bool? ?? false,
     faceUrl: m['faceUrl'] as String?,
   );
 
-  factory AppUser.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) =>
-      AppUser.fromMap(doc.id, doc.data() ?? const {});
+  factory AppUser.fromJson(Map<String, dynamic> m) =>
+      AppUser.fromMap(m['uid'] as String, m);
 
   /// Fields the admin panel edits. Device / face fields are managed separately.
   Map<String, dynamic> toProfileMap() => {

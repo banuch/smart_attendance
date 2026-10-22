@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,14 +30,13 @@ class HomeScreen extends ConsumerWidget {
           IconButton(
             tooltip: 'History',
             icon: const Icon(Icons.calendar_month),
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const HistoryScreen())),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const HistoryScreen())),
           ),
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),
-            onPressed: () => _confirmSignOut(context),
+            onPressed: () => _confirmSignOut(context, ref),
           ),
         ],
       ),
@@ -84,7 +82,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmSignOut(BuildContext context) async {
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -101,7 +99,7 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
     );
-    if (ok == true) await FirebaseAuth.instance.signOut();
+    if (ok == true) await ref.read(authStateProvider.notifier).signOut();
   }
 }
 
@@ -125,7 +123,10 @@ class _TodayCard extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Text("Today's status", style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  "Today's status",
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const Spacer(),
                 if (r != null) StatusChip(eval.status),
               ],
@@ -193,7 +194,11 @@ class _TodayCard extends ConsumerWidget {
 }
 
 class _PunchInfo extends StatelessWidget {
-  const _PunchInfo({required this.label, required this.punch, required this.icon});
+  const _PunchInfo({
+    required this.label,
+    required this.punch,
+    required this.icon,
+  });
 
   final String label;
   final Punch? punch;
@@ -244,8 +249,7 @@ class _ClockState extends State<_Clock> {
   Widget build(BuildContext context) => Text(
     timeFormat.format(DateTime.now()),
     textAlign: TextAlign.center,
-    style: Theme.of(
-      context,
-    ).textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w300),
+    style: Theme.of(context).textTheme.displayMedium
+        ?.copyWith(fontWeight: FontWeight.w300),
   );
 }

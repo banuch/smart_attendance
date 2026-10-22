@@ -181,7 +181,9 @@ class SiteMap extends StatelessWidget {
               ),
           ],
         ),
-        const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+        const SimpleAttributionWidget(
+          source: Text('OpenStreetMap contributors'),
+        ),
       ],
     );
   }

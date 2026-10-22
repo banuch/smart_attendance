@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 /// One check-in or check-out event.
 class Punch {
   const Punch({
@@ -35,8 +33,8 @@ class Punch {
   bool get flagged => flagReasons.isNotEmpty;
 
   factory Punch.fromMap(Map<String, dynamic> m) => Punch(
-    // A pending server timestamp reads as null in the local snapshot.
-    time: (m['time'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    // ISO 8601 from the server clock.
+    time: DateTime.parse(m['time'] as String).toLocal(),
     lat: (m['lat'] as num?)?.toDouble() ?? 0,
     lng: (m['lng'] as num?)?.toDouble() ?? 0,
     accuracy: (m['accuracy'] as num?)?.toDouble() ?? 0,
@@ -49,28 +47,12 @@ class Punch {
     flagReasons: (m['flagReasons'] as List?)?.cast<String>() ?? const [],
     deviceId: m['deviceId'] as String? ?? '',
   );
-
-  /// Map written to Firestore; `time` is always the server's clock.
-  Map<String, dynamic> toWriteMap() => {
-    'time': FieldValue.serverTimestamp(),
-    'lat': lat,
-    'lng': lng,
-    'accuracy': accuracy,
-    'siteId': siteId,
-    'siteName': siteName,
-    'distanceMeters': distanceMeters,
-    'photoUrl': photoUrl,
-    'photoPath': photoPath,
-    'faceScore': faceScore,
-    'flagReasons': flagReasons,
-    'deviceId': deviceId,
-  };
 }
 
 enum ReviewDecision { approved, rejected }
 
 /// One employee's attendance for one calendar day.
-/// Document id: `{uid}_{yyyy-MM-dd}`.
+/// Record id: `{uid}_{yyyy-MM-dd}`.
 class AttendanceRecord {
   const AttendanceRecord({
     required this.id,
@@ -126,6 +108,6 @@ class AttendanceRecord {
         reviewNote: m['reviewNote'] as String?,
       );
 
-  factory AttendanceRecord.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) =>
-      AttendanceRecord.fromMap(d.id, d.data() ?? const {});
+  factory AttendanceRecord.fromJson(Map<String, dynamic> m) =>
+      AttendanceRecord.fromMap(m['id'] as String, m);
 }

@@ -73,10 +73,7 @@ class ReportExporter {
   ];
 
   static Uint8List csv(List<ReportRow> rows) {
-    final data = [
-      detailHeader,
-      for (final r in rows) detailRow(r),
-    ];
+    final data = [detailHeader, for (final r in rows) detailRow(r)];
     // BOM so Excel opens UTF-8 names correctly.
     return Uint8List.fromList(utf8.encode('﻿${Csv().encode(data)}'));
   }
@@ -126,22 +123,34 @@ class ReportExporter {
         ),
         build: (_) => [
           pw.SizedBox(height: 12),
-          pw.Text('Summary', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'Summary',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
             headers: summaryHeader,
             data: [for (final s in summary) summaryRow(s)],
             cellStyle: const pw.TextStyle(fontSize: 9),
-            headerStyle: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+            headerStyle: pw.TextStyle(
+              fontSize: 9,
+              fontWeight: pw.FontWeight.bold,
+            ),
           ),
           pw.SizedBox(height: 16),
-          pw.Text('Daily detail', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'Daily detail',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
             headers: detailHeader,
             data: [for (final r in rows) detailRow(r)],
             cellStyle: const pw.TextStyle(fontSize: 8),
-            headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+            headerStyle: pw.TextStyle(
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+            ),
           ),
         ],
       ),

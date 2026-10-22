@@ -57,7 +57,11 @@ class EmployeeGate extends ConsumerWidget {
 
     final identity = device.value!;
     if (user.deviceId == null) {
-      return _BindDevice(user: user, deviceId: identity.id, model: identity.model);
+      return _BindDevice(
+        user: user,
+        deviceId: identity.id,
+        model: identity.model,
+      );
     }
     if (user.deviceId != identity.id) {
       return BlockedScreen(
@@ -111,7 +115,7 @@ class _BindDeviceState extends ConsumerState<_BindDevice> {
     try {
       await ref
           .read(userRepoProvider)
-          .bindDevice(widget.user.uid, widget.deviceId, widget.model);
+          .bindDevice(widget.deviceId, widget.model);
     } catch (e) {
       if (mounted) setState(() => _error = e);
     }

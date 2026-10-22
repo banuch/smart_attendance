@@ -55,7 +55,9 @@ class _PunchScreenState extends ConsumerState<PunchScreen> {
       _error = null;
     });
     try {
-      final position = await ref.read(locationServiceProvider).currentPosition();
+      final position = await ref
+          .read(locationServiceProvider)
+          .currentPosition();
       final user = ref.read(currentUserProvider).value!;
       final sites = await ref.read(sitesProvider.future);
       final check = ref
@@ -91,7 +93,6 @@ class _PunchScreenState extends ConsumerState<PunchScreen> {
       final punch = await ref
           .read(punchServiceProvider)
           .submit(
-            user: ref.read(currentUserProvider).value!,
             today: widget.today,
             location: _location!,
             capture: capture,
@@ -151,7 +152,8 @@ class _PunchScreenState extends ConsumerState<PunchScreen> {
             const SizedBox(height: 24),
             if (_canOpenSettings)
               OutlinedButton(
-                onPressed: () => ref.read(locationServiceProvider).openSettings(),
+                onPressed: () =>
+                    ref.read(locationServiceProvider).openSettings(),
                 child: const Text('Open settings'),
               ),
             const SizedBox(height: 8),
@@ -165,7 +167,10 @@ class _PunchScreenState extends ConsumerState<PunchScreen> {
           children: [
             const Icon(Icons.where_to_vote, size: 72, color: Colors.green),
             const SizedBox(height: 16),
-            Text('You are at ${loc.match.site.name}', style: theme.textTheme.titleLarge),
+            Text(
+              'You are at ${loc.match.site.name}',
+              style: theme.textTheme.titleLarge,
+            ),
             const SizedBox(height: 4),
             Text(
               '${loc.match.distance.round()} m from site centre · '
@@ -191,7 +196,10 @@ class _PunchScreenState extends ConsumerState<PunchScreen> {
             FilledButton.icon(
               onPressed: _selfieAndSubmit,
               style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
               ),
               icon: const Icon(Icons.camera_front),
               label: Text(_error == null ? 'Take selfie' : 'Retake selfie'),

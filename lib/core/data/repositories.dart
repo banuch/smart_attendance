@@ -1,187 +1,173 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import '../models/app_user.dart';
 import '../models/attendance_record.dart';
 import '../models/shift.dart';
 import '../models/site.dart';
+import 'api_client.dart';
+
+List<T> _list<T>(dynamic json, T Function(Map<String, dynamic>) parse) => [
+  for (final m in json as List) parse(Map<String, dynamic>.from(m as Map)),
+];
+
+Map<String, dynamic> _map(dynamic json) =>
+    Map<String, dynamic>.from(json as Map);
 
 class UserRepository {
-  UserRepository(this._db);
+  UserRepository(this._api);
 
-  final FirebaseFirestore _db;
+  final ApiClient _api;
 
-  CollectionReference<Map<String, dynamic>> get _col => _db.collection('users');
+  Future<AppUser> me() async =>
+      AppUser.fromJson(_map(await _api.get('/api/me')));
 
-  Stream<AppUser?> watch(String uid) => _col
-      .doc(uid)
-      .snapshots()
-      .map((d) => d.exists ? AppUser.fromDoc(d) : null);
+  Stream<AppUser?> watchMe() => poll(_api, me);
 
-  Stream<List<AppUser>> watchAll() => _col
-      .orderBy('name')
-      .snapshots()
-      .map((s) => s.docs.map(AppUser.fromDoc).toList());
+  Stream<List<AppUser>> watchAll() => poll(
+    _api,
+    () async => _list(await _api.get('/api/users'), AppUser.fromJson),
+    every: const Duration(seconds: 60),
+  );
 
-  Future<void> create(AppUser user) => _col.doc(user.uid).set({
-    ...user.toProfileMap(),
-    'deviceId': null,
-    'faceEmbedding': null,
-    'createdAt': FieldValue.serverTimestamp(),
-  });
+  /// Creates the login and profile. Admin only.
+  Future<void> create(AppUser user, String password) =>
+      _api.post('/api/users', {...user.toProfileMap(), 'password': password});
 
   Future<void> updateProfile(AppUser user) =>
-      _col.doc(user.uid).update(user.toProfileMap());
+      _api.put('/api/users/${user.uid}', user.toProfileMap());
 
   /// Called by the employee on first login from a device.
-  Future<void> bindDevice(String uid, String deviceId, String model) =>
-      _col.doc(uid).update({
-        'deviceId': deviceId,
-        'deviceModel': model,
-        'deviceBoundAt': FieldValue.serverTimestamp(),
-      });
+  Future<void> bindDevice(String deviceId, String model) =>
+      _api.post('/api/me/device', {'deviceId': deviceId, 'deviceModel': model});
 
-  Future<void> resetDevice(String uid) => _col.doc(uid).update({
-    'deviceId': null,
-    'deviceModel': null,
-    'deviceBoundAt': null,
-  });
+  Future<void> resetDevice(String uid) =>
+      _api.post('/api/users/$uid/reset-device');
 
   /// Called by the employee once, during face enrollment.
-  Future<void> enrollFace(
-    String uid, {
+  Future<void> enrollFace({
     required List<double> embedding,
-    required String url,
-    required String path,
-  }) => _col.doc(uid).update({
-    'faceEmbedding': embedding,
-    'faceUrl': url,
-    'facePath': path,
-    'faceEnrolledAt': FieldValue.serverTimestamp(),
-  });
+    required Uint8List jpeg,
+  }) => _api.postPhoto(
+    '/api/me/face',
+    jpeg: jpeg,
+    fields: {'embedding': jsonEncode(embedding)},
+  );
 
-  Future<void> resetFace(String uid) => _col.doc(uid).update({
-    'faceEmbedding': null,
-    'faceUrl': null,
-    'facePath': null,
-    'faceEnrolledAt': null,
-  });
+  Future<void> resetFace(String uid) => _api.post('/api/users/$uid/reset-face');
+
+  /// Sets a new password; the user is signed out on every device.
+  Future<void> setPassword(String uid, String password) =>
+      _api.post('/api/users/$uid/password', {'password': password});
 }
 
 class SiteRepository {
-  SiteRepository(this._db);
+  SiteRepository(this._api);
 
-  final FirebaseFirestore _db;
+  final ApiClient _api;
 
-  CollectionReference<Map<String, dynamic>> get _col => _db.collection('sites');
-
-  Stream<List<Site>> watchAll() => _col
-      .orderBy('name')
-      .snapshots()
-      .map((s) => s.docs.map((d) => Site.fromMap(d.id, d.data())).toList());
+  Stream<List<Site>> watchAll() => poll(
+    _api,
+    () async => _list(await _api.get('/api/sites'), Site.fromJson),
+    every: const Duration(seconds: 60),
+  );
 
   Future<void> save(Site site) => site.id.isEmpty
-      ? _col.add(site.toMap())
-      : _col.doc(site.id).set(site.toMap());
+      ? _api.post('/api/sites', site.toMap())
+      : _api.put('/api/sites/${site.id}', site.toMap());
 
-  Future<void> delete(String id) => _col.doc(id).delete();
+  Future<void> delete(String id) => _api.delete('/api/sites/$id');
 }
 
 class ShiftRepository {
-  ShiftRepository(this._db);
+  ShiftRepository(this._api);
 
-  final FirebaseFirestore _db;
+  final ApiClient _api;
 
-  CollectionReference<Map<String, dynamic>> get _col =>
-      _db.collection('shifts');
-
-  Stream<List<Shift>> watchAll() => _col
-      .orderBy('name')
-      .snapshots()
-      .map((s) => s.docs.map((d) => Shift.fromMap(d.id, d.data())).toList());
+  Stream<List<Shift>> watchAll() => poll(
+    _api,
+    () async => _list(await _api.get('/api/shifts'), Shift.fromJson),
+    every: const Duration(seconds: 60),
+  );
 
   Future<void> save(Shift shift) => shift.id.isEmpty
-      ? _col.add(shift.toMap())
-      : _col.doc(shift.id).set(shift.toMap());
+      ? _api.post('/api/shifts', shift.toMap())
+      : _api.put('/api/shifts/${shift.id}', shift.toMap());
 
-  Future<void> delete(String id) => _col.doc(id).delete();
+  Future<void> delete(String id) => _api.delete('/api/shifts/$id');
 }
 
 class AttendanceRepository {
-  AttendanceRepository(this._db);
+  AttendanceRepository(this._api);
 
-  final FirebaseFirestore _db;
+  final ApiClient _api;
 
-  CollectionReference<Map<String, dynamic>> get _col =>
-      _db.collection('attendance');
+  Future<List<AttendanceRecord>> _range(Map<String, String> query) async =>
+      _list(
+        await _api.get('/api/attendance', query: query),
+        AttendanceRecord.fromJson,
+      );
 
-  List<AttendanceRecord> _records(QuerySnapshot<Map<String, dynamic>> s) =>
-      s.docs.map(AttendanceRecord.fromDoc).toList();
+  /// The signed-in user's record for today (the server decides the day).
+  Stream<AttendanceRecord?> watchToday() => poll(_api, () async {
+    final res = _map(await _api.get('/api/attendance/today'));
+    final record = res['record'];
+    return record == null ? null : AttendanceRecord.fromJson(_map(record));
+  });
 
-  Stream<AttendanceRecord?> watchDay(String uid, String date) => _col
-      .doc(AttendanceRecord.docId(uid, date))
-      .snapshots()
-      .map((d) => d.exists ? AttendanceRecord.fromDoc(d) : null);
-
-  /// One employee's records in [from, to] (date keys, inclusive).
+  /// One employee's records in [from, to] (date keys, inclusive). Employees
+  /// always get their own records, whatever [uid] says.
   Stream<List<AttendanceRecord>> watchUserRange(
     String uid,
     String from,
     String to,
-  ) => _col
-      .where('uid', isEqualTo: uid)
-      .where('date', isGreaterThanOrEqualTo: from)
-      .where('date', isLessThanOrEqualTo: to)
-      .orderBy('date', descending: true)
-      .snapshots()
-      .map(_records);
+  ) => poll(_api, () => _range({'from': from, 'to': to, 'uid': uid}));
 
   /// All employees' records in [from, to] (admin only).
-  Stream<List<AttendanceRecord>> watchRange(String from, String to) => _col
-      .where('date', isGreaterThanOrEqualTo: from)
-      .where('date', isLessThanOrEqualTo: to)
-      .orderBy('date', descending: true)
-      .snapshots()
-      .map(_records);
+  Stream<List<AttendanceRecord>> watchRange(String from, String to) =>
+      poll(_api, () => _range({'from': from, 'to': to}));
 
-  Stream<List<AttendanceRecord>> watchPendingReview() => _col
-      .where('flagged', isEqualTo: true)
-      .where('reviewed', isEqualTo: false)
-      .snapshots()
-      .map(_records);
+  Stream<List<AttendanceRecord>> watchPendingReview() => poll(
+    _api,
+    () async => _list(
+      await _api.get('/api/attendance/pending'),
+      AttendanceRecord.fromJson,
+    ),
+  );
 
-  Future<void> checkIn({
-    required String uid,
-    required String employeeName,
-    required String date,
-    required String? shiftId,
-    required Punch punch,
-  }) => _col.doc(AttendanceRecord.docId(uid, date)).set({
-    'uid': uid,
-    'employeeName': employeeName,
-    'date': date,
-    'shiftId': shiftId,
-    'checkIn': punch.toWriteMap(),
-    'flagged': punch.flagged,
-    'reviewed': false,
-  });
-
-  Future<void> checkOut(AttendanceRecord record, Punch punch) =>
-      _col.doc(record.id).update({
-        'checkOut': punch.toWriteMap(),
-        'flagged': record.flagged || punch.flagged,
-        'reviewed': record.reviewed && !punch.flagged,
-      });
+  /// Check-in or check-out; the server decides which, and verifies it.
+  Future<AttendanceRecord> punch({
+    required double lat,
+    required double lng,
+    required double accuracy,
+    required bool mocked,
+    required String deviceId,
+    required List<double>? embedding,
+    required Uint8List jpeg,
+  }) async {
+    final res = _map(
+      await _api.postPhoto(
+        '/api/attendance/punch',
+        jpeg: jpeg,
+        fields: {
+          'lat': '$lat',
+          'lng': '$lng',
+          'accuracy': '$accuracy',
+          'mocked': '$mocked',
+          'deviceId': deviceId,
+          if (embedding != null) 'embedding': jsonEncode(embedding),
+        },
+      ),
+    );
+    return AttendanceRecord.fromJson(_map(res['record']));
+  }
 
   Future<void> review(
     String id, {
     required ReviewDecision decision,
-    required String reviewerUid,
     String? note,
-  }) => _col.doc(id).update({
-    'reviewed': true,
-    'reviewDecision': decision.name,
-    'reviewedBy': reviewerUid,
-    'reviewedAt': FieldValue.serverTimestamp(),
-    'reviewNote': note,
+  }) => _api.post('/api/attendance/$id/review', {
+    'decision': decision.name,
+    'note': note,
   });
 }

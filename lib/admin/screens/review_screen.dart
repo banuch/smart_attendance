@@ -69,7 +69,11 @@ class _ReviewTile extends StatelessWidget {
                 for (final r in reasons)
                   Chip(
                     visualDensity: VisualDensity.compact,
-                    avatar: const Icon(Icons.flag, size: 16, color: Colors.orange),
+                    avatar: const Icon(
+                      Icons.flag,
+                      size: 16,
+                      color: Colors.orange,
+                    ),
                     label: Text(FlagReason.label(r)),
                   ),
               ],
