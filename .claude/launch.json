@@ -2,10 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "admin-web",
-      "runtimeExecutable": "C:\\Users\\banuc\\tools\\flutter\\bin\\flutter.bat",
-      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "8080", "--release", "-t", "lib/main_admin.dart"],
+      "name": "api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "server", "run", "dev"],
       "port": 8080
+    },
+    {
+      "name": "admin-web",
+      "runtimeExecutable": "C:\Users\banuc\tools\flutter\bin\flutter.bat",
+      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "5000", "--release", "-t", "lib/main_admin.dart", "--dart-define=API_URL=http://localhost:8080"],
+      "port": 5000
     }
   ]
 }
