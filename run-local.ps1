@@ -14,12 +14,15 @@
       setup      First-time setup: npm install, .env, database tables, admin user.
       test       Run all tests (server unit + API, Flutter).
       status     Show what is running.
+      demo       Put the app on the internet for a client demo (Cloudflare tunnel):
+                 builds the admin panel and a release APK for the public HTTPS
+                 address. Keep the window open during the demo; Enter stops it.
 
   Each server opens in its own window. Close that window (or press Ctrl+C in it)
   to stop it.
 #>
 param(
-    [ValidateSet('menu', 'start', 'api', 'admin', 'employee', 'setup', 'test', 'status')]
+    [ValidateSet('menu', 'start', 'api', 'admin', 'employee', 'setup', 'test', 'status', 'demo')]
     [string]$Action = 'menu',
     [switch]$Phone
 )
@@ -29,6 +32,7 @@ $ErrorActionPreference = 'Stop'
 # ---- Settings you might change ------------------------------------------------
 $ApiPort   = 8080
 $AdminPort = 5000
+$DemoPort  = 5100   # demo: admin panel + API behind one address, for the tunnel
 # -------------------------------------------------------------------------------
 
 $Root      = $PSScriptRoot
@@ -59,10 +63,14 @@ function Test-PortInUse($port) {
 }
 
 # Opens a new PowerShell window titled $title that runs $command in $dir.
+# Returns the window's process.
 function Start-Window($title, $dir, $command) {
     $script = "`$Host.UI.RawUI.WindowTitle = '$title'; Set-Location '$dir'; $command"
-    Start-Process powershell -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', $script
+    return Start-Process powershell -PassThru -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', $script
 }
+
+# Ends a process and everything it started.
+function Stop-Tree($id) { & taskkill.exe /T /F /PID $id 2>&1 | Out-Null }
 
 function Assert-ServerReady {
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Fail 'Node.js not found. Install Node 22+.' }
@@ -77,7 +85,7 @@ function Start-Api {
     if (Test-PortInUse $ApiPort) { Fail "Port $ApiPort is used by another program." }
     Assert-ServerReady
     Say "Starting API in a new window..."
-    Start-Window 'Smart Attendance API' $ServerDir 'npm run dev'
+    $null = Start-Window 'Smart Attendance API' $ServerDir 'npm run dev'
 
     # Wait up to 30 s for the health check (it also proves MySQL is reachable).
     for ($i = 0; $i -lt 30; $i++) {
@@ -93,7 +101,7 @@ function Start-Admin {
     $flutter = Get-Flutter
     Say "Starting admin panel in a new window (first build takes a minute)..."
     Say "It opens Chrome at http://localhost:$AdminPort. Press 'r' in its window to hot-reload." 'Gray'
-    Start-Window 'Smart Attendance Admin' $Root "& '$flutter' run -d chrome --web-port $AdminPort -t lib/main_admin.dart --dart-define=API_URL=$ApiUrl"
+    $null = Start-Window 'Smart Attendance Admin' $Root "& '$flutter' run -d chrome --web-port $AdminPort -t lib/main_admin.dart --dart-define=API_URL=$ApiUrl"
 }
 
 function Get-Adb {
@@ -206,6 +214,146 @@ function Invoke-Tests {
     & (Get-Flutter) test
 }
 
+# ---- Client demo over a Cloudflare tunnel ---------------------------------------
+
+# Serves the built admin panel and passes /api and /files on to the API, so the
+# panel and the phones use one HTTPS address (like nginx does in production).
+$DemoProxyJs = @'
+import fs from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
+
+const [root, port, apiPort] = [path.resolve(process.argv[2]), process.argv[3], process.argv[4]];
+const types = {
+  '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
+  '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon', '.svg': 'image/svg+xml',
+  '.wasm': 'application/wasm', '.ttf': 'font/ttf', '.otf': 'font/otf', '.woff2': 'font/woff2',
+};
+
+http.createServer((req, res) => {
+  if (req.url.startsWith('/api/') || req.url.startsWith('/files/')) {
+    const headers = { ...req.headers, 'x-forwarded-proto': 'https' };
+    const upstream = http.request({ host: '127.0.0.1', port: apiPort, path: req.url, method: req.method, headers }, (r) => {
+      res.writeHead(r.statusCode, r.headers);
+      r.pipe(res);
+    });
+    upstream.on('error', () => { res.writeHead(502); res.end('API not reachable'); });
+    req.pipe(upstream);
+    return;
+  }
+  // Unknown paths fall back to index.html (single-page app).
+  let file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+  if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+    file = path.join(root, 'index.html');
+  }
+  res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
+  fs.createReadStream(file).pipe(res);
+}).listen(port, () => console.log(`demo proxy on :${port}`));
+'@
+
+function Get-Cloudflared {
+    $cmd = Get-Command cloudflared.exe -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    foreach ($p in "${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe", "$env:ProgramFiles\cloudflared\cloudflared.exe") {
+        if (Test-Path $p) { return $p }
+    }
+    $answer = Read-Host 'cloudflared is not installed. Install it now with winget? (Y/n)'
+    if ($answer -match '^[nN]') { Fail 'cloudflared is needed for the demo.' }
+    winget install --id Cloudflare.cloudflared -e --accept-source-agreements --accept-package-agreements
+    foreach ($p in "${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe", "$env:ProgramFiles\cloudflared\cloudflared.exe") {
+        if (Test-Path $p) { return $p }
+    }
+    Fail 'cloudflared installed, but not found. Open a new PowerShell window and try again.'
+}
+
+# Stops the dev API on $ApiPort so it can be restarted with the public address.
+function Stop-DevApi {
+    $conn = Get-NetTCPConnection -LocalPort $ApiPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $conn) { return }
+    $answer = Read-Host "The API is running. Restart it for the demo? (Y/n)"
+    if ($answer -match '^[nN]') { Fail 'The demo needs to restart the API with the public address.' }
+    # `node --watch` runs the server as a child; stop the watcher too.
+    $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $($conn.OwningProcess)"
+    $parent = Get-CimInstance Win32_Process -Filter "ProcessId = $($proc.ParentProcessId)" -ErrorAction SilentlyContinue
+    if ($parent -and $parent.Name -eq 'node.exe') { Stop-Tree $parent.ProcessId } else { Stop-Tree $proc.ProcessId }
+    Start-Sleep -Seconds 1
+}
+
+function Start-Demo {
+    Assert-ServerReady
+    $flutter = Get-Flutter
+    $cloudflared = Get-Cloudflared
+    if (Test-PortInUse $DemoPort) { Fail "Port $DemoPort is busy. Is a demo already running?" }
+
+    $work = Join-Path $env:TEMP 'smart-attendance-demo'
+    New-Item -ItemType Directory -Force $work | Out-Null
+    $tunnelLog = Join-Path $work 'tunnel.log'
+    $proxyJs = Join-Path $work 'proxy.mjs'
+    Set-Content -Path $proxyJs -Value $DemoProxyJs -Encoding ascii
+    Remove-Item $tunnelLog -ErrorAction SilentlyContinue
+    $started = @()
+
+    try {
+        Say '1/5  Opening the Cloudflare tunnel...'
+        $tunnel = Start-Process $cloudflared -PassThru -WindowStyle Hidden -RedirectStandardError $tunnelLog `
+            -RedirectStandardOutput (Join-Path $work 'tunnel.out') `
+            -ArgumentList 'tunnel', '--no-autoupdate', '--url', "http://localhost:$DemoPort"
+        $started += $tunnel.Id
+        $url = $null
+        for ($i = 0; $i -lt 60 -and -not $url; $i++) {
+            Start-Sleep -Seconds 1
+            $m = Select-String -Path $tunnelLog -Pattern 'https://[a-z0-9-]+\.trycloudflare\.com' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($m) { $url = $m.Matches[0].Value }
+        }
+        if (-not $url) { Fail "No tunnel address after 60 s. See $tunnelLog" }
+        Say "     Public address: $url" 'Green'
+
+        Say '2/5  Restarting the API with the public address...'
+        Stop-DevApi
+        # Variables set here win over server\.env (node --env-file keeps them).
+        $api = Start-Window 'Smart Attendance API (demo)' $ServerDir "`$env:PUBLIC_URL='$url'; `$env:CORS_ORIGINS='$url'; npm run dev"
+        $started += $api.Id
+        for ($i = 0; $i -lt 30 -and -not (Test-Api); $i++) { Start-Sleep -Seconds 1 }
+        if (-not (Test-Api)) { Fail 'API did not start. Check its window.' }
+
+        Set-Location $Root
+        Say '3/5  Building the admin panel (about a minute)...'
+        # No API_URL: the panel calls the address it is served from.
+        & $flutter build web --release -t lib/main_admin.dart
+        if ($LASTEXITCODE) { Fail 'Admin panel build failed.' }
+        $proxy = Start-Process node -PassThru -WindowStyle Hidden -ArgumentList "`"$proxyJs`"", "`"$(Join-Path $Root 'build\web')`"", $DemoPort, $ApiPort
+        $started += $proxy.Id
+
+        Say '4/5  Building the release APK (a few minutes)...'
+        & $flutter build apk --release -t lib/main_employee.dart "--dart-define=API_URL=$url"
+        if ($LASTEXITCODE) { Fail 'APK build failed.' }
+        $apk = Join-Path $Root 'build\demo\SmartAttendance-demo.apk'
+        New-Item -ItemType Directory -Force (Split-Path $apk) | Out-Null
+        Copy-Item (Join-Path $Root 'build\app\outputs\flutter-apk\app-release.apk') $apk -Force
+
+        Say '5/5  Checking the public address...'
+        try { $ok = (Invoke-RestMethod "$url/api/health" -TimeoutSec 20).ok } catch { $ok = $false }
+        if ($ok) { Say '     Reachable from the internet.' 'Green' }
+        else { Say '     Not answering yet - Cloudflare can take a minute. Try the link in a browser.' 'Yellow' }
+
+        Say ''
+        Say '  DEMO IS LIVE' 'Green'
+        Say "  Admin panel : $url"
+        Say "  Phone APK   : $apk"
+        Say '                Send it to the client (WhatsApp, Drive, email). They turn on'
+        Say '                "Install unknown apps" for the app they open it with.'
+        Say ''
+        Say '  This PC, MySQL and this window must stay on during the demo.' 'Yellow'
+        Say '  The address changes every time you run demo, so the APK must be rebuilt.' 'Yellow'
+        Say ''
+        Read-Host '  Press Enter to stop the demo'
+    } finally {
+        foreach ($id in $started) { Stop-Tree $id }
+        Set-Location $Root
+        Say 'Demo stopped. Start the normal API again with: .\run-local.ps1 api' 'Gray'
+    }
+}
+
 function Show-Status {
     if (Test-Api) { Say "API          running   $ApiUrl" 'Green' }
     elseif (Test-PortInUse $ApiPort) { Say "API          port $ApiPort busy but health check fails" 'Yellow' }
@@ -227,6 +375,7 @@ function Show-Menu {
     Say '  5) Run employee app, API over Wi-Fi'
     Say '  6) First-time setup'
     Say '  7) Run tests'
+    Say '  8) Client demo over the internet (Cloudflare tunnel)'
     Say '  Q) Quit'
     switch ((Read-Host '  Choose').Trim()) {
         '1' { Start-Api; Start-Admin }
@@ -236,6 +385,7 @@ function Show-Menu {
         '5' { $script:Phone = $true; Start-Employee }
         '6' { Invoke-Setup }
         '7' { Invoke-Tests }
+        '8' { Start-Demo }
         default { }
     }
 }
@@ -249,4 +399,5 @@ switch ($Action) {
     'setup'    { Invoke-Setup }
     'test'     { Invoke-Tests }
     'status'   { Show-Status }
+    'demo'     { Start-Demo }
 }
