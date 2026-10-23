@@ -25,18 +25,28 @@ class _EnrollFaceScreenState extends ConsumerState<EnrollFaceScreen> {
   FaceCapture? _capture;
   bool _busy = false;
 
+  /// Why the last photo was rejected. Stays on screen until the next try, as
+  /// a snackbar is easy to miss.
+  String? _error;
+
   Future<void> _takePhoto() async {
     final path = await SelfieCaptureScreen.open(
       context,
       title: 'Register your face',
     );
     if (path == null || !mounted) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       final capture = await ref.read(faceServiceProvider).process(path);
       setState(() => _capture = capture);
     } on FaceException catch (e) {
-      if (mounted) showSnack(context, e.message, error: true);
+      if (mounted) setState(() => _error = e.message);
+    } catch (e, st) {
+      debugPrint('Face processing failed: $e\n$st');
+      if (mounted) setState(() => _error = 'Could not process the photo: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -89,6 +99,13 @@ class _EnrollFaceScreenState extends ConsumerState<EnrollFaceScreen> {
             ),
             const _Tip(Icons.person_outline, 'Only you in the frame'),
             const SizedBox(height: 24),
+            if (_error != null) ...[
+              Text(
+                _error!,
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (photo != null)
               Center(
                 child: ClipRRect(
