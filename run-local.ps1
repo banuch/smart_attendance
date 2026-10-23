@@ -9,8 +9,8 @@
       start      Start the API (if not already running) and the admin web panel.
       api        Start only the API server        -> http://localhost:8080
       admin      Start only the admin web panel   -> http://localhost:5000
-      employee   Run the employee app on the Android emulator / phone (USB).
-                 Add -Phone to use this PC's Wi-Fi IP (for a real phone).
+      employee   Run the employee app on a USB phone (or starts the emulator if none).
+                 Add -Phone to call the API over Wi-Fi instead of through USB.
       setup      First-time setup: npm install, .env, database tables, admin user.
       test       Run all tests (server unit + API, Flutter).
       status     Show what is running.
@@ -96,9 +96,47 @@ function Start-Admin {
     Start-Window 'Smart Attendance Admin' $Root "& '$flutter' run -d chrome --web-port $AdminPort -t lib/main_admin.dart --dart-define=API_URL=$ApiUrl"
 }
 
+function Get-Adb {
+    $cmd = Get-Command adb.exe -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    $fallback = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
+    if (Test-Path $fallback) { return $fallback }
+    Fail 'adb not found. Install the Android SDK (Android Studio).'
+}
+
+# Serial numbers of connected Android phones / emulators.
+function Get-AndroidDevices($adb) {
+    return @(& $adb devices | Select-String "^(\S+)\s+device$" | ForEach-Object { $_.Matches[0].Groups[1].Value })
+}
+
+# Starts the first Android emulator and waits until it has booted.
+function Start-Emulator($adb) {
+    $emulator = Join-Path $env:LOCALAPPDATA 'Android\Sdk\emulator\emulator.exe'
+    if (-not (Test-Path $emulator)) { Fail 'No phone connected and no emulator installed. Plug in a phone with USB debugging on.' }
+    $avd = & $emulator -list-avds | Select-Object -First 1
+    if (-not $avd) { Fail 'No phone connected and no emulator created. Plug in a phone with USB debugging on.' }
+    Say "No phone connected - starting emulator '$avd'..."
+    Start-Process $emulator -ArgumentList '-avd', $avd
+    & $adb wait-for-device
+    for ($i = 0; $i -lt 120; $i++) {
+        if ((& $adb shell getprop sys.boot_completed 2>$null) -match '1') { return }
+        Start-Sleep -Seconds 1
+    }
+    Fail 'Emulator did not finish booting within 2 minutes.'
+}
+
 function Start-Employee {
     $flutter = Get-Flutter
-    $flutterArgs = @('run', '-t', 'lib/main_employee.dart')
+    $adb = Get-Adb
+    $devices = @(Get-AndroidDevices $adb)
+    if ($devices.Count -eq 0) {
+        Start-Emulator $adb
+        $devices = @(Get-AndroidDevices $adb)
+    }
+    $serial = $devices[0]
+    if ($devices.Count -gt 1) { Say "Several Android devices found; using $serial." 'Yellow' }
+
+    $flutterArgs = @('run', '-d', $serial, '-t', 'lib/main_employee.dart')
     if ($Phone) {
         # The phone must reach this PC over Wi-Fi, so use the PC's LAN address.
         $ip = Get-NetIPAddress -AddressFamily IPv4 |
@@ -108,7 +146,12 @@ function Start-Employee {
         $flutterArgs += "--dart-define=API_URL=http://${ip}:$ApiPort"
         Say "Phone will call the API at http://${ip}:$ApiPort (allow it through Windows Firewall if asked)."
     } else {
-        Say 'Emulator uses http://10.0.2.2:8080 to reach this PC (built into debug builds).'
+        # Forward the device's localhost:8080 to this PC over USB. Works the same
+        # for a real phone and an emulator, with no Wi-Fi or firewall setup.
+        & $adb -s $serial reverse tcp:$ApiPort tcp:$ApiPort | Out-Null
+        if ($LASTEXITCODE) { Fail "adb reverse failed for $serial." }
+        $flutterArgs += "--dart-define=API_URL=http://localhost:$ApiPort"
+        Say "App on $serial will call the API at http://localhost:$ApiPort (forwarded over USB)."
     }
     if (-not (Test-Api)) { Say "Warning: API is not running at $ApiUrl." 'Yellow' }
     Set-Location $Root
@@ -180,8 +223,8 @@ function Show-Menu {
     Say '  1) Start API + admin panel'
     Say '  2) Start API only'
     Say '  3) Start admin panel only'
-    Say '  4) Run employee app (emulator / USB phone)'
-    Say '  5) Run employee app on phone over Wi-Fi'
+    Say '  4) Run employee app (USB phone or emulator)'
+    Say '  5) Run employee app, API over Wi-Fi'
     Say '  6) First-time setup'
     Say '  7) Run tests'
     Say '  Q) Quit'
